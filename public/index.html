@@ -1,0 +1,647 @@
+
+// public/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Transcoding App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .main-content {
+            padding: 30px;
+        }
+
+        .auth-section, .app-section {
+            margin-bottom: 30px;
+        }
+
+        .auth-form {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        button {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .user-info {
+            background: #e8f5e8;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2ecc71;
+        }
+
+        .section {
+            background: #f8f9fa;
+            margin: 20px 0;
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+
+        .section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .job-item {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status.pending { background: #fff3cd; color: #856404; }
+        .status.processing { background: #cce5ff; color: #004085; }
+        .status.completed { background: #d4edda; color: #155724; }
+        .status.failed { background: #f8d7da; color: #721c24; }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            transition: width 0.3s ease;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-display {
+            background: white;
+            border: 2px dashed #3498db;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .file-input-display:hover {
+            border-color: #2980b9;
+            background: #f8f9fa;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Video Transcoding Platform</h1>
+            <p>High-performance video processing with cloud-scale architecture</p>
+        </div>
+
+        <div class="main-content">
+            <!-- Authentication Section -->
+            <div id="authSection" class="auth-section">
+                <div class="auth-form">
+                    <h3>Login</h3>
+                    <div class="form-group">
+                        <label>Username:</label>
+                        <input type="text" id="username" placeholder="Enter username (admin, user1, or viewer)">
+                    </div>
+                    <div class="form-group">
+                        <label>Password:</label>
+                        <input type="password" id="password" placeholder="Enter password">
+                    </div>
+                    <button onclick="login()">Login</button>
+                    
+                    <div style="margin-top: 20px;">
+                        <strong>Demo Accounts:</strong><br>
+                        <small>admin/admin123 (full access) | user1/user123 (upload/transcode) | viewer/viewer123 (view only)</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Application -->
+            <div id="appSection" class="app-section hidden">
+                <div id="userInfo" class="user-info"></div>
+
+                <!-- Upload Section -->
+                <div class="section">
+                    <h3>📤 Upload Video</h3>
+                    <div class="form-group">
+                        <label>Select Video File:</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="videoFile" accept="video/*">
+                            <div class="file-input-display">
+                                <div>📁 Click to select a video file</div>
+                                <small>Supported: MP4, AVI, MOV, WMV, FLV, WebM, MKV (max 100MB)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Title:</label>
+                        <input type="text" id="videoTitle" placeholder="Video title (optional)">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="videoDescription" placeholder="Video description (optional)" rows="3"></textarea>
+                    </div>
+                    <button onclick="uploadVideo()" id="uploadBtn">Upload Video</button>
+                </div>
+
+                <!-- Transcoding Section -->
+                <div class="section">
+                    <h3>⚙️ Start Transcoding</h3>
+                    <div class="form-group">
+                        <label>Quality:</label>
+                        <select id="transcodeQuality">
+                            <option value="low">Low (640x480)</option>
+                            <option value="medium" selected>Medium (1280x720)</option>
+                            <option value="high">High (1920x1080)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Format:</label>
+                        <select id="transcodeFormat">
+                            <option value="mp4" selected>MP4</option>
+                            <option value="webm">WebM</option>
+                            <option value="avi">AVI</option>
+                        </select>
+                    </div>
+                    <button onclick="startTranscoding()" id="transcodeBtn">Start CPU-Intensive Transcoding</button>
+                </div>
+
+                <!-- Load Testing Section -->
+                <div class="section">
+                    <h3>🔥 CPU Load Testing</h3>
+                    <p>Generate high CPU load for auto-scaling demonstration</p>
+                    <div class="form-group">
+                        <label>Duration (seconds):</label>
+                        <input type="number" id="stressDuration" value="300" min="30" max="600">
+                    </div>
+                    <button onclick="startStressTest()" id="stressBtn">Start CPU Stress Test</button>
+                    <button onclick="startMultipleStressTests()" id="multiStressBtn" class="btn-danger">Start Multiple Stress Tests (4x)</button>
+                </div>
+
+                <!-- Jobs Section -->
+                <div class="section">
+                    <h3>📊 Processing Jobs</h3>
+                    <button onclick="refreshJobs()" class="btn-secondary">Refresh Jobs</button>
+                    <div id="jobsList"></div>
+                </div>
+            </div>
+
+            <!-- Alerts -->
+            <div id="alerts"></div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = null;
+        let currentUser = null;
+        let uploadedVideoId = null;
+
+        // Authentication
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!username || !password) {
+                showAlert('Please enter username and password', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.token;
+                    currentUser = data.user;
+                    
+                    document.getElementById('authSection').classList.add('hidden');
+                    document.getElementById('appSection').classList.remove('hidden');
+                    
+                    updateUserInfo();
+                    refreshJobs();
+                    showAlert('Login successful!', 'success');
+                } else {
+                    showAlert(data.error || 'Login failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            currentUser = null;
+            uploadedVideoId = null;
+            
+            document.getElementById('authSection').classList.remove('hidden');
+            document.getElementById('appSection').classList.add('hidden');
+            
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            
+            showAlert('Logged out successfully', 'success');
+        }
+
+        function updateUserInfo() {
+            const userInfo = document.getElementById('userInfo');
+            userInfo.innerHTML = `
+                <strong>👤 Logged in as:</strong> ${currentUser.username} 
+                <span class="status ${currentUser.role}">${currentUser.role}</span>
+                <button onclick="logout()" class="btn-secondary" style="float: right;">Logout</button>
+                <br><small><strong>Permissions:</strong> ${currentUser.permissions.join(', ')}</small>
+            `;
+        }
+
+        // File upload
+        document.getElementById('videoFile').addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const display = document.querySelector('.file-input-display');
+                display.innerHTML = `
+                    <div><strong>📹 ${file.name}</strong></div>
+                    <small>Size: ${(file.size / (1024*1024)).toFixed(2)} MB</small>
+                `;
+            }
+        });
+
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoFile');
+            const title = document.getElementById('videoTitle').value;
+            const description = document.getElementById('videoDescription').value;
+
+            if (!fileInput.files[0]) {
+                showAlert('Please select a video file', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', fileInput.files[0]);
+            formData.append('title', title);
+            formData.append('description', description);
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+
+            try {
+                const response = await fetch('/api/videos/upload', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    uploadedVideoId = data.video.id;
+                    showAlert(`Video uploaded successfully! ID: ${uploadedVideoId}`, 'success');
+                } else {
+                    showAlert(data.error || 'Upload failed', 'error');
+                }
+            } catch (error) {
+                showAlert('Upload error: ' + error.message, 'error');
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Video';
+            }
+        }
+
+        async function startTranscoding() {
+            if (!uploadedVideoId) {
+                showAlert('Please upload a video first', 'error');
+                return;
+            }
+
+            const quality = document.getElementById('transcodeQuality').value;
+            const format = document.getElementById('transcodeFormat').value;
+
+            const transcodeBtn = document.getElementById('transcodeBtn');
+            transcodeBtn.disabled = true;
+            transcodeBtn.textContent = 'Starting Transcoding...';
+
+            try {
+                const response = await fetch(`/api/videos/${uploadedVideoId}/transcode`, {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ quality, format })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Transcoding job started! This will generate high CPU load.', 'success');
+                    setTimeout(refreshJobs, 1000);
+                } else {
+                    showAlert(data.error || 'Failed to start transcoding', 'error');
+                }
+            } catch (error) {
+                showAlert('Transcoding error: ' + error.message, 'error');
+            } finally {
+                transcodeBtn.disabled = false;
+                transcodeBtn.textContent = 'Start CPU-Intensive Transcoding';
+            }
+        }
+
+        async function startStressTest() {
+            const duration = parseInt(document.getElementById('stressDuration').value) * 1000;
+            
+            const stressBtn = document.getElementById('stressBtn');
+            stressBtn.disabled = true;
+            stressBtn.textContent = 'Running Stress Test...';
+
+            try {
+                const response = await fetch('/api/stress', {
+                    method: 'POST',
+                    headers: { 
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ duration, intensity: 2000000 })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`CPU stress test started for ${duration/1000} seconds. Check server CPU usage!`, 'success');
+                } else {
+                    showAlert(data.error || 'Failed to start stress test', 'error');
+                }
+            } catch (error) {
+                showAlert('Stress test error: ' + error.message, 'error');
+            } finally {
+                setTimeout(() => {
+                    stressBtn.disabled = false;
+                    stressBtn.textContent = 'Start CPU Stress Test';
+                }, 5000);
+            }
+        }
+
+        async function startMultipleStressTests() {
+            const duration = parseInt(document.getElementById('stressDuration').value) * 1000;
+            
+            const multiStressBtn = document.getElementById('multiStressBtn');
+            multiStressBtn.disabled = true;
+            multiStressBtn.textContent = 'Running 4x Stress Tests...';
+
+            const promises = [];
+            for (let i = 0; i < 4; i++) {
+                promises.push(
+                    fetch('/api/stress', {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${authToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ duration, intensity: 2000000 })
+                    })
+                );
+            }
+
+            try {
+                await Promise.all(promises);
+                showAlert('4 concurrent CPU stress tests started! This should max out server CPU.', 'success');
+            } catch (error) {
+                showAlert('Multiple stress test error: ' + error.message, 'error');
+            } finally {
+                setTimeout(() => {
+                    multiStressBtn.disabled = false;
+                    multiStressBtn.textContent = 'Start Multiple Stress Tests (4x)';
+                }, 10000);
+            }
+        }
+
+        async function refreshJobs() {
+            try {
+                const response = await fetch('/api/videos/my-videos', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayJobs(data.videos);
+                } else {
+                    showAlert(data.error || 'Failed to load jobs', 'error');
+                }
+            } catch (error) {
+                showAlert('Jobs loading error: ' + error.message, 'error');
+            }
+        }
+
+        function displayJobs(jobs) {
+            const jobsList = document.getElementById('jobsList');
+            
+            if (jobs.length === 0) {
+                jobsList.innerHTML = '<p>No processing jobs found. Upload and transcode a video to see jobs here.</p>';
+                return;
+            }
+
+            jobsList.innerHTML = jobs.map(job => `
+                <div class="job-item">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <strong>Job ${job.id}</strong>
+                        <span class="status ${job.status}">${job.status}</span>
+                    </div>
+                    <div><strong>Quality:</strong> ${job.quality} | <strong>Format:</strong> ${job.format}</div>
+                    <div><strong>Created:</strong> ${new Date(job.createdAt).toLocaleString()}</div>
+                    ${job.progress !== undefined ? `
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${job.progress}%"></div>
+                        </div>
+                        <div>Progress: ${job.progress}%</div>
+                    ` : ''}
+                    ${job.completedAt ? `<div><strong>Completed:</strong> ${new Date(job.completedAt).toLocaleString()}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function showAlert(message, type) {
+            const alerts = document.getElementById('alerts');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            
+            alerts.appendChild(alert);
+            
+            setTimeout(() => {
+                alerts.removeChild(alert);
+            }, 5000);
+        }
+
+        // Auto-refresh jobs every 10 seconds when logged in
+        setInterval(() => {
+            if (authToken) {
+                refreshJobs();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
