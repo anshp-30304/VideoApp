@@ -12,9 +12,15 @@ const jobRoutes = require('./routes/jobs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-// Security middleware
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],  // 👈 allows onclick=""
+    },
+  },
+}));
 app.use(compression());
 
 // Rate limiting

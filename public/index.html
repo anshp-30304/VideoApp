@@ -1,5 +1,5 @@
 
-// public/index.html
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -458,7 +458,7 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    uploadedVideoId = data.video.id;
+                    uploadedVideoId = data.video.filename;
                     showAlert(`Video uploaded successfully! ID: ${uploadedVideoId}`, 'success');
                 } else {
                     showAlert(data.error || 'Upload failed', 'error');
@@ -495,7 +495,8 @@
                 });
 
                 const data = await response.json();
-
+                console.log(data);
+                
                 if (response.ok) {
                     showAlert('Transcoding job started! This will generate high CPU load.', 'success');
                     setTimeout(refreshJobs, 1000);

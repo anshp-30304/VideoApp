@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
 const { createTranscodeJob, getJobsByUser } = require('../data/jobs');
 const { transcodeVideo } = require('../services/videoProcessor');
+const { log } = require('console');
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ const fileFilter = (req, file, cb) => {
     'video/webm',
     'video/mkv'
   ];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -61,12 +62,11 @@ router.post('/upload', authenticateToken, requirePermission('upload'), upload.si
     }
 
     const { title, description, quality = 'medium' } = req.body;
-    
+
     const videoData = {
-      id: uuidv4(),
+      id: req.file.filename,           // <-- this is the saved file name
       filename: req.file.filename,
       originalName: req.file.originalname,
-      title: title || req.file.originalname,
       description: description || '',
       size: req.file.size,
       mimetype: req.file.mimetype,
@@ -87,7 +87,7 @@ router.post('/upload', authenticateToken, requirePermission('upload'), upload.si
   }
 });
 
-// Start transcoding job
+// // Start transcoding job
 router.post('/:videoId/transcode', authenticateToken, requirePermission('transcode'), async (req, res) => {
   try {
     const { videoId } = req.params;
@@ -96,11 +96,15 @@ router.post('/:videoId/transcode', authenticateToken, requirePermission('transco
     const job = createTranscodeJob({
       videoId,
       userId: req.user.userId,
+      filename:videoId,
       quality,
+     inputFilename: videoId,
       format,
       parameters: req.body.parameters || {}
     });
 
+  
+    
     // Start transcoding asynchronously
     transcodeVideo(job).catch(error => {
       console.error('Transcoding error:', error);
@@ -110,6 +114,7 @@ router.post('/:videoId/transcode', authenticateToken, requirePermission('transco
       message: 'Transcoding job started',
       job: {
         id: job.id,
+        inputFilename: job.inputFilename,
         status: job.status,
         quality: job.quality,
         format: job.format,
@@ -126,19 +131,20 @@ router.post('/:videoId/transcode', authenticateToken, requirePermission('transco
 router.get('/my-videos', authenticateToken, (req, res) => {
   try {
     const userJobs = getJobsByUser(req.user.userId);
-    
+
     res.json({
       videos: userJobs.map(job => ({
         id: job.id,
         videoId: job.videoId,
         title: job.title || 'Untitled',
         status: job.status,
+        inputFilename: job.inputFilename,
         quality: job.quality,
         format: job.format,
         progress: job.progress,
         createdAt: job.createdAt,
         completedAt: job.completedAt,
-        outputPath: job.outputPath
+        outputPath: "./outputs"
       }))
     });
   } catch (error) {
@@ -152,22 +158,22 @@ router.get('/:videoId/download', authenticateToken, async (req, res) => {
   try {
     const { videoId } = req.params;
     const { type = 'original' } = req.query;
-    
+
     // In a real app, you'd check if user owns this video or has permission
     // For now, we'll serve files from the uploads or outputs directory
-    
+
     let filePath;
     if (type === 'original') {
       filePath = path.join(__dirname, '..', 'uploads', videoId);
     } else {
       filePath = path.join(__dirname, '..', 'outputs', videoId);
     }
-    
+
     const stats = await fs.stat(filePath);
     if (!stats.isFile()) {
       return res.status(404).json({ error: 'Video file not found' });
     }
-    
+
     res.sendFile(filePath);
   } catch (error) {
     console.error('Download error:', error);
@@ -179,7 +185,7 @@ router.get('/:videoId/download', authenticateToken, async (req, res) => {
 router.delete('/:videoId', authenticateToken, requirePermission('delete'), async (req, res) => {
   try {
     const { videoId } = req.params;
-    
+
     // Delete original file
     try {
       const originalPath = path.join(__dirname, '..', 'uploads', videoId);
@@ -187,7 +193,7 @@ router.delete('/:videoId', authenticateToken, requirePermission('delete'), async
     } catch (error) {
       console.log('Original file not found or already deleted');
     }
-    
+
     // Delete output files
     try {
       const outputPath = path.join(__dirname, '..', 'outputs', videoId);
@@ -195,7 +201,7 @@ router.delete('/:videoId', authenticateToken, requirePermission('delete'), async
     } catch (error) {
       console.log('Output file not found or already deleted');
     }
-    
+
     res.json({ message: 'Video deleted successfully' });
   } catch (error) {
     console.error('Delete error:', error);

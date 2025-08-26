@@ -8,6 +8,7 @@ const createTranscodeJob = (jobData) => {
     id: uuidv4(),
     videoId: jobData.videoId,
     userId: jobData.userId,
+    inputFilename: jobData.inputFilename,
     status: 'pending',
     quality: jobData.quality || 'medium',
     format: jobData.format || 'mp4',

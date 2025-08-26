@@ -31,7 +31,8 @@ const transcodeVideo = async (job) => {
     
     updateJobStatus(job.id, 'processing');
     
-    const inputPath = path.join(__dirname, '..', 'uploads', job.videoId);
+    const inputPath = path.join(__dirname, '..', 'uploads' ,job.inputFilename);
+    
     const outputDir = path.join(__dirname, '..', 'outputs');
     await fs.mkdir(outputDir, { recursive: true });
     
@@ -39,7 +40,8 @@ const transcodeVideo = async (job) => {
     const outputPath = path.join(outputDir, outputFilename);
     
     const preset = qualityPresets[job.quality] || qualityPresets.medium;
-    
+    console.log("Job inputFilename:", job.inputFilename);
+console.log("Resolved inputPath:", inputPath);
     return new Promise((resolve, reject) => {
       let command = ffmpeg(inputPath)
         .videoBitrate(preset.videoBitrate)
