@@ -14,7 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Security middleware
-app.use(helmet());
+
 app.use(compression());
 
 // Rate limiting
@@ -24,7 +24,15 @@ const limiter = rateLimit({
   message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
-
+app.use(
+  helmet.contentSecurityPolicy({
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "'unsafe-inline'"],         // allows inline <script>
+      "script-src-attr": ["'self'", "'unsafe-inline'"]   // allows inline event handlers
+    }
+  })
+);
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || '*',
@@ -114,7 +122,7 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT,'0.0.0.0',() => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
