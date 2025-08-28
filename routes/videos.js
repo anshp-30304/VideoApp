@@ -4,67 +4,41 @@ const path = require('path');
 const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const { authenticateToken, requirePermission } = require('../middleware/auth');
-const { createTranscodeJob, getJobsByUser } = require('../data/jobs');
 const { transcodeVideo } = require('../services/videoProcessor');
-const { log } = require('console');
-
+const Video = require('../data/videos'); // Mongoose model
+const Job = require('../data/jobs');
 const router = express.Router();
 
-// Configure multer for file uploads
+// Multer storage
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     const uploadDir = path.join(__dirname, '..', 'uploads');
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-      cb(null, uploadDir);
-    } catch (error) {
-      cb(error);
-    }
+    await fs.mkdir(uploadDir, { recursive: true });
+    cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    const uniqueId = uuidv4();
-    const extension = path.extname(file.originalname);
-    cb(null, `${uniqueId}${extension}`);
+    cb(null, uuidv4() + path.extname(file.originalname));
   }
 });
 
+// File filter
 const fileFilter = (req, file, cb) => {
   const allowedTypes = [
-    'video/mp4',
-    'video/avi',
-    'video/mov',
-    'video/wmv',
-    'video/flv',
-    'video/webm',
-    'video/mkv'
+    'video/mp4','video/avi','video/mov','video/wmv','video/flv','video/webm','video/mkv'
   ];
-
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type. Only video files are allowed.'), false);
-  }
+  cb(null, allowedTypes.includes(file.mimetype));
 };
 
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 100 * 1024 * 1024 // 100MB limit
-  }
-});
+const upload = multer({ storage, fileFilter, limits: { fileSize: 100 * 1024 * 1024 } });
 
-// Upload video endpoint
+// Upload video
 router.post('/upload', authenticateToken, requirePermission('upload'), upload.single('video'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No video file uploaded' });
-    }
+    if (!req.file) return res.status(400).json({ error: 'No video uploaded' });
 
     const { title, description, quality = 'medium' } = req.body;
 
-    const videoData = {
-      id: req.file.filename,           // <-- this is the saved file name
+    const video = new Video({
       filename: req.file.filename,
       originalName: req.file.originalname,
       description: description || '',
@@ -74,47 +48,44 @@ router.post('/upload', authenticateToken, requirePermission('upload'), upload.si
       uploadedAt: new Date(),
       path: req.file.path,
       status: 'uploaded',
-      quality: quality
-    };
-
-    res.status(201).json({
-      message: 'Video uploaded successfully',
-      video: videoData
+      quality
     });
+
+    await video.save();
+
+    res.status(201).json({ message: 'Video uploaded successfully', video });
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ error: 'Upload failed' });
   }
 });
 
-// // Start transcoding job
 router.post('/:videoId/transcode', authenticateToken, requirePermission('transcode'), async (req, res) => {
   try {
     const { videoId } = req.params;
-    const { quality = 'medium', format = 'mp4' } = req.body;
+    const { quality = 'medium', format = 'mp4', parameters = {} } = req.body;
 
-    const job = createTranscodeJob({
-      videoId,
+   const video = await Video.findOne({ filename: videoId }); 
+    if (!video) return res.status(404).json({ error: 'Video not found' });
+
+    // Create a new Job in Mongo
+    const job = await Job.createTranscodeJob({
+      videoId: video._id.toString(),
       userId: req.user.userId,
-      filename:videoId,
+      inputFilename: video.filename,
       quality,
-     inputFilename: videoId,
       format,
-      parameters: req.body.parameters || {}
+      parameters
     });
 
-  
-    
     // Start transcoding asynchronously
-    transcodeVideo(job).catch(error => {
-      console.error('Transcoding error:', error);
-    });
+    transcodeVideo(job).catch(err => console.error('Transcoding error:', err));
 
     res.status(202).json({
       message: 'Transcoding job started',
       job: {
-        id: job.id,
-        inputFilename: job.inputFilename,
+        id: job._id,
+        videoId: job.videoId,
         status: job.status,
         quality: job.quality,
         format: job.format,
@@ -127,52 +98,39 @@ router.post('/:videoId/transcode', authenticateToken, requirePermission('transco
   }
 });
 
-// Get user's videos
-router.get('/my-videos', authenticateToken, (req, res) => {
+router.get('/my-jobs', authenticateToken, async (req, res) => {
   try {
-    const userJobs = getJobsByUser(req.user.userId);
+    const jobs = await Job.getJobsByUser(req.user.userId);
+    res.json({ jobs });
+  } catch (error) {
+    console.error('Get jobs error:', error);
+    res.status(500).json({ error: 'Failed to retrieve jobs' });
+  }
+});
 
-    res.json({
-      videos: userJobs.map(job => ({
-        id: job.id,
-        videoId: job.videoId,
-        title: job.title || 'Untitled',
-        status: job.status,
-        inputFilename: job.inputFilename,
-        quality: job.quality,
-        format: job.format,
-        progress: job.progress,
-        createdAt: job.createdAt,
-        completedAt: job.completedAt,
-        outputPath: "./outputs"
-      }))
-    });
+// Get user's videos
+router.get('/my-videos', authenticateToken, async (req, res) => {
+  try {
+    const videos = await Video.find({ uploadedBy: req.user.userId });
+    res.json({ videos });
   } catch (error) {
     console.error('Get videos error:', error);
     res.status(500).json({ error: 'Failed to retrieve videos' });
   }
 });
 
-// Get video file
+// Download video
 router.get('/:videoId/download', authenticateToken, async (req, res) => {
   try {
     const { videoId } = req.params;
     const { type = 'original' } = req.query;
 
-    // In a real app, you'd check if user owns this video or has permission
-    // For now, we'll serve files from the uploads or outputs directory
+   const video = await Video.findOne({ filename: videoId }); 
+    if (!video) return res.status(404).json({ error: 'Video not found' });
 
-    let filePath;
-    if (type === 'original') {
-      filePath = path.join(__dirname, '..', 'uploads', videoId);
-    } else {
-      filePath = path.join(__dirname, '..', 'outputs', videoId);
-    }
-
-    const stats = await fs.stat(filePath);
-    if (!stats.isFile()) {
-      return res.status(404).json({ error: 'Video file not found' });
-    }
+    const filePath = type === 'original'
+        ? path.join(__dirname, '..', 'uploads', video.filename)
+        : path.join(__dirname, '..', 'outputs', video.filename);
 
     res.sendFile(filePath);
   } catch (error) {
@@ -185,22 +143,14 @@ router.get('/:videoId/download', authenticateToken, async (req, res) => {
 router.delete('/:videoId', authenticateToken, requirePermission('delete'), async (req, res) => {
   try {
     const { videoId } = req.params;
+   const video = await Video.findOne({ filename: videoId }); 
+    if (!video) return res.status(404).json({ error: 'Video not found' });
 
-    // Delete original file
-    try {
-      const originalPath = path.join(__dirname, '..', 'uploads', videoId);
-      await fs.unlink(originalPath);
-    } catch (error) {
-      console.log('Original file not found or already deleted');
-    }
+    // Delete files
+    await fs.unlink(path.join(__dirname, '..', 'uploads', video.filename)).catch(() => {});
+    await fs.unlink(path.join(__dirname, '..', 'outputs', video.filename)).catch(() => {});
 
-    // Delete output files
-    try {
-      const outputPath = path.join(__dirname, '..', 'outputs', videoId);
-      await fs.unlink(outputPath);
-    } catch (error) {
-      console.log('Output file not found or already deleted');
-    }
+    await video.remove();
 
     res.json({ message: 'Video deleted successfully' });
   } catch (error) {

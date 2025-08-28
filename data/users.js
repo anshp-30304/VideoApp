@@ -1,111 +1,101 @@
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
-// In-memory user storage (in production, this would be a database)
-const users = new Map();
-
-// Default users for demonstration
-const initializeUsers = async () => {
-  const defaultUsers = [
-    {
-      username: 'admin',
-      password: 'admin123',
-      role: 'admin',
-      permissions: ['upload', 'transcode', 'delete', 'manage_users', 'view_all']
-    },
-    {
-      username: 'user1',
-      password: 'user123',
-      role: 'user',
-      permissions: ['upload', 'transcode']
-    },
-    {
-      username: 'viewer',
-      password: 'viewer123',
-      role: 'viewer',
-      permissions: ['view']
-    }
-  ];
-
-  for (const userData of defaultUsers) {
-    if (!findUserByUsername(userData.username)) {
-      await createUser(userData.username, userData.password, userData.role);
-    }
+// ===== User Schema =====
+const userSchema = new mongoose.Schema({
+  id: { type: String, default: uuidv4 }, // UUID
+  username: { type: String, unique: true, required: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'user', 'viewer'], default: 'user' },
+  permissions: [String],
+  createdAt: { type: Date, default: Date.now },
+  settings: {
+    defaultQuality: { type: String, default: 'medium' },
+    notifications: { type: Boolean, default: true }
   }
-};
+});
 
-const findUserByUsername = (username) => {
-  for (const user of users.values()) {
-    if (user.username === username) {
-      return user;
-    }
-  }
-  return null;
-};
+const User = mongoose.model('User', userSchema);
 
-const findUserById = (id) => {
-  return users.get(id);
-};
-
-const createUser = async (username, password, role = 'user') => {
-  const hashedPassword = await bcrypt.hash(password, 10);
-  
-  const permissions = getPermissionsForRole(role);
-  
-  const user = {
-    id: uuidv4(),
-    username,
-    password: hashedPassword,
-    role,
-    permissions,
-    createdAt: new Date(),
-    settings: {
-      defaultQuality: 'medium',
-      notifications: true
-    }
-  };
-  
-  users.set(user.id, user);
-  return user;
-};
-
+// ===== Helper functions =====
 const getPermissionsForRole = (role) => {
   const rolePermissions = {
     admin: ['upload', 'transcode', 'delete', 'manage_users', 'view_all'],
     user: ['upload', 'transcode'],
     viewer: ['view']
   };
-  
   return rolePermissions[role] || rolePermissions.user;
 };
 
-const getAllUsers = () => {
-  return Array.from(users.values()).map(user => ({
-    id: user.id,
-    username: user.username,
-    role: user.role,
-    permissions: user.permissions,
-    createdAt: user.createdAt
-  }));
+const createUser = async (username, password, role = 'user') => {
+  const existingUser = await User.findOne({ username });
+  if (existingUser) return existingUser;
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const user = new User({
+    username,
+    password: hashedPassword,
+    role,
+    permissions: getPermissionsForRole(role)
+  });
+
+  return user.save();
 };
 
-const updateUserSettings = (userId, settings) => {
-  const user = users.get(userId);
-  if (user) {
-    user.settings = { ...user.settings, ...settings };
-    return user;
+const findUserByUsername = async (username) => {
+  return User.findOne({ username });
+};
+
+const findUserById = async (id) => {
+  return User.findOne({ id });
+};
+
+const getAllUsers = async () => {
+  return User.find({}, { password: 0 }); // exclude password
+};
+
+const updateUserSettings = async (userId, settings) => {
+  return User.findOneAndUpdate(
+      { id: userId },
+      { $set: { settings } },
+      { new: true }
+  );
+};
+
+// ===== Initialize default users =====
+const initializeUsers = async () => {
+  const defaultUsers = [
+    {
+      username: 'admin',
+      password: 'admin123',
+      role: 'admin'
+    },
+    {
+      username: 'user1',
+      password: 'user123',
+      role: 'user'
+    },
+    {
+      username: 'viewer',
+      password: 'viewer123',
+      role: 'viewer'
+    }
+  ];
+
+  for (const userData of defaultUsers) {
+    await createUser(userData.username, userData.password, userData.role);
   }
-  return null;
 };
 
-// Initialize default users
 initializeUsers();
 
 module.exports = {
-  users,
+  User,
+  createUser,
   findUserByUsername,
   findUserById,
-  createUser,
   getAllUsers,
   updateUserSettings
 };

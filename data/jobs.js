@@ -1,74 +1,74 @@
+const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
 
-// In-memory job storage (in production, this would be a database)
-const jobs = new Map();
+const jobSchema = new mongoose.Schema({
+  _id: { type: String, default: uuidv4 },
+  videoId: { type: String, required: true },
+  userId: { type: String, required: true },
+  inputFilename: { type: String, required: true },
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' },
+  quality: { type: String, default: 'medium' },
+  format: { type: String, default: 'mp4' },
+  parameters: { type: Object, default: {} },
+  progress: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+  startedAt: Date,
+  completedAt: Date,
+  outputPath: String,
+  error: String
+});
 
-const createTranscodeJob = (jobData) => {
-  const job = {
-    id: uuidv4(),
+// Create Transcode Job
+jobSchema.statics.createTranscodeJob = async function(jobData) {
+  const job = new this({
     videoId: jobData.videoId,
     userId: jobData.userId,
     inputFilename: jobData.inputFilename,
-    status: 'pending',
     quality: jobData.quality || 'medium',
     format: jobData.format || 'mp4',
-    parameters: jobData.parameters || {},
-    progress: 0,
-    createdAt: new Date(),
-    startedAt: null,
-    completedAt: null,
-    outputPath: null,
-    error: null
-  };
-  
-  jobs.set(job.id, job);
+    parameters: jobData.parameters || {}
+  });
+  await job.save();
   return job;
 };
 
-const getJobById = (jobId) => {
-  return jobs.get(jobId);
+// Get Job by ID
+jobSchema.statics.getJobById = async function(jobId) {
+  return this.findById(jobId);
 };
 
-const getAllJobs = () => {
-  return Array.from(jobs.values()).sort((a, b) => b.createdAt - a.createdAt);
+// Get All Jobs (sorted by createdAt desc)
+jobSchema.statics.getAllJobs = async function() {
+  return this.find().sort({ createdAt: -1 });
 };
 
-const getJobsByUser = (userId) => {
-  return Array.from(jobs.values())
-    .filter(job => job.userId === userId)
-    .sort((a, b) => b.createdAt - a.createdAt);
+// Get Jobs by User
+jobSchema.statics.getJobsByUser = async function(userId) {
+  return this.find({ userId }).sort({ createdAt: -1 });
 };
 
-const updateJobStatus = (jobId, status, additionalData = {}) => {
-  const job = jobs.get(jobId);
-  if (job) {
-    job.status = status;
-    if (status === 'processing') {
-      job.startedAt = new Date();
-    } else if (status === 'completed' || status === 'failed') {
-      job.completedAt = new Date();
-    }
-    
-    Object.assign(job, additionalData);
-    return job;
-  }
-  return null;
+// Update Job Status
+jobSchema.statics.updateJobStatus = async function(jobId, status, additionalData = {}) {
+  const job = await this.findById(jobId);
+  if (!job) return null;
+
+  job.status = status;
+  if (status === 'processing') job.startedAt = new Date();
+  if (status === 'completed' || status === 'failed') job.completedAt = new Date();
+
+  Object.assign(job, additionalData);
+  await job.save();
+  return job;
 };
 
-const updateJobProgress = (jobId, progress) => {
-  const job = jobs.get(jobId);
-  if (job) {
-    job.progress = Math.min(100, Math.max(0, progress));
-    return job;
-  }
-  return null;
+// Update Job Progress
+jobSchema.statics.updateJobProgress = async function(jobId, progress) {
+  const job = await this.findById(jobId);
+  if (!job) return null;
+
+  job.progress = Math.min(100, Math.max(0, progress));
+  await job.save();
+  return job;
 };
 
-module.exports = {
-  createTranscodeJob,
-  getJobById,
-  getAllJobs,
-  getJobsByUser,
-  updateJobStatus,
-  updateJobProgress
-};
+module.exports = mongoose.model('Job', jobSchema);

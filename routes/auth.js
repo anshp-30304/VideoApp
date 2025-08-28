@@ -2,12 +2,15 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { authenticateToken } = require('../middleware/auth');
-const { users, findUserByUsername, createUser } = require('../data/users');
+const {
+  createUser,
+  findUserByUsername
+} = require('../data/users'); // Mongo version
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-// Login endpoint
+
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -16,7 +19,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const user = findUserByUsername(username);
+    const user = await findUserByUsername(username);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -27,14 +30,14 @@ router.post('/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { 
-        userId: user.id, 
-        username: user.username, 
-        role: user.role,
-        permissions: user.permissions 
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
+        {
+          userId: user.id,
+          username: user.username,
+          role: user.role,
+          permissions: user.permissions
+        },
+        JWT_SECRET,
+        { expiresIn: '24h' }
     );
 
     res.json({
@@ -53,7 +56,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// Register endpoint (for demonstration - in production this would be more restricted)
+// ===== Register endpoint =====
 router.post('/register', async (req, res) => {
   try {
     const { username, password, role = 'user' } = req.body;
@@ -62,21 +65,22 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    if (findUserByUsername(username)) {
+    const existingUser = await findUserByUsername(username);
+    if (existingUser) {
       return res.status(400).json({ error: 'Username already exists' });
     }
 
     const newUser = await createUser(username, password, role);
-    
+
     const token = jwt.sign(
-      { 
-        userId: newUser.id, 
-        username: newUser.username, 
-        role: newUser.role,
-        permissions: newUser.permissions 
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
+        {
+          userId: newUser.id,
+          username: newUser.username,
+          role: newUser.role,
+          permissions: newUser.permissions
+        },
+        JWT_SECRET,
+        { expiresIn: '24h' }
     );
 
     res.status(201).json({
@@ -95,7 +99,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Token validation endpoint
+// ===== Token validation =====
 router.get('/validate', authenticateToken, (req, res) => {
   res.json({
     valid: true,
@@ -108,7 +112,7 @@ router.get('/validate', authenticateToken, (req, res) => {
   });
 });
 
-// Logout endpoint (client-side token removal)
+// ===== Logout =====
 router.post('/logout', (req, res) => {
   res.json({ message: 'Logout successful' });
 });

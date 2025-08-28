@@ -1,10 +1,33 @@
+version: "3.9"
 
 services:
   video-transcoding-app:
     build: .
+    container_name: video-transcoding-app
     ports:
       - "3000:3000"
+      - "4040:4040"
     environment:
-      - NODE_ENV=production
-      - JWT_SECRET=N11857374_Assessment1
-      - PORT=3000
+      NODE_ENV: production
+      JWT_SECRET: N11857374_Assessment1
+      PORT: 3000
+      MONGO_URI: mongodb://mongo:27017/videodb
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
