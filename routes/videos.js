@@ -8,7 +8,6 @@ const { transcodeVideo } = require('../services/videoProcessor');
 const Video = require('../data/videos'); // Mongoose model
 const Job = require('../data/jobs');
 const router = express.Router();
-
 // Multer storage
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -98,24 +97,16 @@ router.post('/:videoId/transcode', authenticateToken, requirePermission('transco
   }
 });
 
+
 router.get('/my-jobs', authenticateToken, async (req, res) => {
+  console.log('Fetching jobs for userId:', req.user.userId);
   try {
     const jobs = await Job.getJobsByUser(req.user.userId);
+    console.log('Jobs found:', jobs.length);
     res.json({ jobs });
   } catch (error) {
-    console.error('Get jobs error:', error);
+    console.error('Get user jobs error:', error);
     res.status(500).json({ error: 'Failed to retrieve jobs' });
-  }
-});
-
-// Get user's videos
-router.get('/my-videos', authenticateToken, async (req, res) => {
-  try {
-    const videos = await Video.find({ uploadedBy: req.user.userId });
-    res.json({ videos });
-  } catch (error) {
-    console.error('Get videos error:', error);
-    res.status(500).json({ error: 'Failed to retrieve videos' });
   }
 });
 
